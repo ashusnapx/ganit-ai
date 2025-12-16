@@ -79,3 +79,6 @@ tzdata==2025.3
 ujson==5.11.0
 urllib3==2.6.2
 wcwidth==0.2.14
+faster-whisper
+soundfile 
+numpy
