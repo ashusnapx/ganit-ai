@@ -7,6 +7,7 @@ from agents.solver_agent import SolverAgent
 from agents.verifier_agent import VerifierAgent
 from agents.explainer_agent import ExplainerAgent
 from rag.retriever import Retriever
+from memory.store_hitl import store_hitl_signal
 
 # =========================================================
 # PAGE CONFIG
@@ -262,6 +263,61 @@ for i, step in enumerate(explanation["explanation_steps"], 1):
 st.markdown("#### ⚠️ Common mistakes")
 for m in explanation["common_mistakes"]:
     st.write(f"• {m}")
+    
+# =========================================================
+# PHASE 7 — HUMAN IN THE LOOP (REAL)
+# =========================================================
+
+hitl_triggered = verifier_output["needs_human_review"]
+
+st.divider()
+st.subheader("🧑‍🏫 Human Review (HITL)")
+
+if hitl_triggered:
+    st.warning(
+        "The system is not confident. "
+        "Please review and correct if needed."
+    )
+
+    # --- Editable parsed question ---
+    corrected_question = st.text_area(
+        "Edit the problem statement (if incorrect)",
+        value=parsed_problem["problem_text"],
+        height=150
+    )
+
+    # --- Editable final answer ---
+    corrected_answer = st.text_area(
+        "Correct the final answer",
+        value=solver_output["final_answer"],
+        height=120
+    )
+
+    # --- Human comment ---
+    human_comment = st.text_area(
+        "Reviewer comment (what went wrong / why this is correct)",
+        placeholder="Explain the correction briefly…",
+        height=100
+    )
+
+    approved = st.checkbox("I approve this correction as ground truth")
+
+    if approved and st.button("✅ Submit correction"):
+        store_hitl_signal({
+            "original_question": final_input_text,
+            "parsed_question": parsed_problem,
+            "retrieved_context": retrieved_chunks,
+            "ai_answer": solver_output["final_answer"],
+            "human_corrected_question": corrected_question,
+            "human_corrected_answer": corrected_answer,
+            "comment": human_comment,
+            "approved": True
+        })
+
+        st.success("Correction saved as learning signal.")
+        st.stop()
+else:
+    st.info("No human review required for this solution.")
 
 # =========================================================
 # FEEDBACK
