@@ -1,4 +1,5 @@
 import streamlit as st
+
 from tools.ocr import run_ocr
 from tools.asr import transcribe_audio
 from agents.parser_agent import parse_problem
@@ -19,6 +20,15 @@ st.set_page_config(
 )
 
 # =========================================================
+# SESSION STATE INIT (CRITICAL)
+# =========================================================
+if "submitted" not in st.session_state:
+    st.session_state.submitted = False
+
+if "pipeline" not in st.session_state:
+    st.session_state.pipeline = {}
+
+# =========================================================
 # BRAND HEADER
 # =========================================================
 st.markdown(
@@ -26,7 +36,8 @@ st.markdown(
     <h1 style="margin-bottom:0;">GanitAI</h1>
     <p style="color:gray; margin-top:0;">
     Multimodal Math Mentor • Reliable • Explainable • HITL-Safe<br>
-    <b>Made by Ashutosh Kumar</b> — <a href="https://github.com/ashusnapx" target="_blank">@ashusnapx</a>
+    <b>Made by Ashutosh Kumar</b> — 
+    <a href="https://github.com/ashusnapx" target="_blank">@ashusnapx</a>
     </p>
     """,
     unsafe_allow_html=True
@@ -44,7 +55,7 @@ def load_retriever():
 retriever = load_retriever()
 
 # =========================================================
-# STEP 1 — INPUT MODE
+# STEP 1 — INPUT
 # =========================================================
 st.subheader("Step 1 · Provide the problem")
 
@@ -54,204 +65,147 @@ input_mode = st.radio(
     horizontal=True
 )
 
-final_input_text = None
-refined_input_text = None
-parsed_problem = None
+raw_input = ""
 
-# =========================================================
-# IMAGE INPUT
-# =========================================================
 if input_mode == "🖼️ Image":
-    uploaded = st.file_uploader(
-        "Upload a math problem image",
-        type=["png", "jpg", "jpeg"]
-    )
-
+    uploaded = st.file_uploader("Upload image", type=["png", "jpg", "jpeg"])
     if uploaded:
         with st.spinner("Running OCR…"):
             with open("temp.png", "wb") as f:
                 f.write(uploaded.getbuffer())
-            ocr_result = run_ocr("temp.png")
+            ocr = run_ocr("temp.png")
+        raw_input = st.text_area("Edit OCR text", ocr["text"], height=160)
 
-        final_input_text = st.text_area(
-            "Edit extracted text if needed",
-            value=ocr_result["text"],
-            height=180
-        )
-
-        st.caption(
-            f"OCR confidence: {ocr_result['confidence']} | "
-            f"Type: {ocr_result['ocr_type']}"
-        )
-
-# =========================================================
-# AUDIO INPUT
-# =========================================================
 elif input_mode == "🎙️ Audio":
-    audio_mode = st.radio(
-        "Audio input method",
-        ["🎙️ Speak now", "📁 Upload file"],
-        horizontal=True
-    )
+    audio = st.audio_input("Speak your question")
+    if audio:
+        with open("temp.wav", "wb") as f:
+            f.write(audio.getbuffer())
+        with st.spinner("Transcribing…"):
+            asr = transcribe_audio("temp.wav")
+        raw_input = st.text_area("Edit transcription", asr["raw_text"], height=140)
 
-    audio_path = None
-
-    if audio_mode == "🎙️ Speak now":
-        audio_bytes = st.audio_input("Speak your math question")
-        if audio_bytes:
-            with open("temp_audio.wav", "wb") as f:
-                f.write(audio_bytes.getbuffer())
-            audio_path = "temp_audio.wav"
-    else:
-        audio_file = st.file_uploader(
-            "Upload audio",
-            type=["wav", "mp3", "m4a"]
-        )
-        if audio_file:
-            with open("temp_audio.wav", "wb") as f:
-                f.write(audio_file.getbuffer())
-            audio_path = "temp_audio.wav"
-
-    if audio_path:
-        with st.spinner("Transcribing audio…"):
-            asr_result = transcribe_audio(audio_path)
-
-        st.markdown(asr_result["highlighted_html"], unsafe_allow_html=True)
-
-        final_input_text = st.text_area(
-            "Edit transcription",
-            value=asr_result["raw_text"],
-            height=150
-        )
-
-        st.caption(f"ASR confidence: {asr_result['confidence']}")
-
-# =========================================================
-# TEXT INPUT
-# =========================================================
 elif input_mode == "⌨️ Text":
-    final_input_text = st.text_area(
+    raw_input = st.text_area(
         "Type your math problem",
-        height=180,
-        placeholder="e.g. Find the limit of sin(x)/x as x → 0"
+        height=160,
+        placeholder="Find the limit of sin(x)/x as x → 0"
     )
 
-# =========================================================
-# STEP 2 — PARSER + HITL
-# =========================================================
-if final_input_text:
-    st.divider()
-    st.subheader("Step 2 · Understanding the problem")
-
-    with st.spinner("Parsing problem…"):
-        parsed_problem = parse_problem(final_input_text)
-
-    with st.expander("Parser output (structured view)"):
-        st.json(parsed_problem)
-
-    if parsed_problem["needs_clarification"]:
-        st.warning("Clarification required")
-
-        answers = []
-        for i, q in enumerate(parsed_problem["clarification_questions"]):
-            ans = st.text_input(f"{i+1}. {q}")
-            if ans:
-                answers.append(ans)
-
-        if answers:
-            refined_input_text = (
-                parsed_problem["problem_text"]
-                + " | Clarifications: "
-                + "; ".join(answers)
-            )
-            parsed_problem = parse_problem(refined_input_text)
-
-            st.success("Clarifications applied")
+# ---------- SUBMIT BUTTON (IMPORTANT FIX) ----------
+if st.button("🚀 Submit problem"):
+    if raw_input.strip():
+        st.session_state.submitted = True
+        st.session_state.pipeline = {
+            "raw_input": raw_input.strip()
+        }
     else:
-        refined_input_text = parsed_problem["problem_text"]
-        st.success("Problem understood")
+        st.warning("Please enter a problem before submitting.")
 
 # =========================================================
-# STEP 3 — KNOWLEDGE RETRIEVAL (RAG)
+# STOP IF NOT SUBMITTED
 # =========================================================
-if refined_input_text:
-    st.divider()
-    st.subheader("Step 3 · Grounding with knowledge")
-
-    with st.spinner("Retrieving relevant knowledge…"):
-        retrieved_chunks = retriever.retrieve(refined_input_text)
-
-    if not retrieved_chunks:
-        st.error("I don’t know. No relevant knowledge found.")
-        st.stop()
-
-    for i, chunk in enumerate(retrieved_chunks, 1):
-        with st.expander(
-            f"Context {i} · {chunk['topic']} · {chunk['difficulty']}"
-        ):
-            st.write(chunk["text"])
-            st.caption(f"Source: {chunk['source']}")
-
-# =========================================================
-# STEP 4 — REASONING AGENTS
-# =========================================================
-if refined_input_text and isinstance(parsed_problem, dict):
-    st.divider()
-    st.subheader("Step 4 · Reasoning & verification")
-
-    # ---------- Intent Router ----------
-    with st.spinner("Routing intent…"):
-        route_plan = route_intent(parsed_problem)
-
-    with st.expander("Intent Router decision"):
-        st.json(route_plan)
-
-    # ---------- Solver ----------
-    solver = SolverAgent()
-
-    with st.spinner("Solving problem…"):
-        solver_output = solver.solve(
-            parsed_problem=parsed_problem,
-            retrieved_chunks=retrieved_chunks,
-            route_plan=route_plan
-        )
-
-    # ---------- Verifier ----------
-    verifier = VerifierAgent()
-
-    with st.spinner("Verifying solution…"):
-        verifier_output = verifier.verify(
-            parsed_problem=parsed_problem,
-            solver_output=solver_output,
-            retrieved_chunks=retrieved_chunks
-        )
-
-    # ---------- Confidence Indicator ----------
-    confidence = verifier_output["confidence"]
-
-    st.progress(confidence)
-
-    if verifier_output["needs_human_review"]:
-        st.error("Low confidence — human review required")
-        st.stop()
-else:
-    st.warning(
-        "Problem not fully parsed yet. "
-        "Please complete previous steps."
-    )
+if not st.session_state.submitted:
     st.stop()
 
 # =========================================================
-# STEP 5 — FINAL EXPLANATION
+# STEP 2 — PARSER
+# =========================================================
+st.divider()
+st.subheader("Step 2 · Understanding the problem")
+
+with st.spinner("Parsing problem…"):
+    parsed = parse_problem(st.session_state.pipeline["raw_input"])
+
+st.session_state.pipeline["parsed_problem"] = parsed
+
+with st.expander("Parser output"):
+    st.json(parsed)
+
+# =========================================================
+# STEP 3 — RAG
+# =========================================================
+st.divider()
+st.subheader("Step 3 · Grounding with knowledge")
+
+with st.spinner("Retrieving knowledge…"):
+    retrieved = retriever.retrieve(parsed["problem_text"])
+
+if not retrieved:
+    st.error("I don’t know. No relevant knowledge found.")
+    st.stop()
+
+st.session_state.pipeline["retrieved_chunks"] = retrieved
+
+for i, c in enumerate(retrieved, 1):
+    with st.expander(f"Context {i} · {c['topic']}"):
+        st.write(c["text"])
+
+# =========================================================
+# STEP 4 — REASONING
+# =========================================================
+st.divider()
+st.subheader("Step 4 · Reasoning & verification")
+
+router = route_intent(parsed)
+
+solver = SolverAgent()
+verifier = VerifierAgent()
+explainer = ExplainerAgent()
+
+with st.spinner("Solving…"):
+    solution = solver.solve(parsed, retrieved, router)
+
+with st.spinner("Verifying…"):
+    verification = verifier.verify(parsed, solution, retrieved)
+
+st.session_state.pipeline["solution"] = solution
+st.session_state.pipeline["verification"] = verification
+
+st.progress(verification["confidence"])
+
+# =========================================================
+# STEP 5 — HITL
+# =========================================================
+if verification["needs_human_review"]:
+    st.warning("Low confidence — human review required")
+
+    corrected_q = st.text_area(
+        "Correct question",
+        parsed["problem_text"]
+    )
+
+    corrected_a = st.text_area(
+        "Correct answer",
+        solution["final_answer"]
+    )
+
+    comment = st.text_area("Reviewer comment")
+
+    if st.checkbox("Approve correction as ground truth"):
+        if st.button("✅ Save correction"):
+            store_hitl_signal({
+                "original_question": parsed["problem_text"],
+                "ai_answer": solution["final_answer"],
+                "human_corrected_question": corrected_q,
+                "human_corrected_answer": corrected_a,
+                "comment": comment,
+                "approved": True
+            })
+            st.success("Correction stored.")
+            st.stop()
+
+# =========================================================
+# STEP 6 — FINAL EXPLANATION
 # =========================================================
 st.divider()
 st.subheader("Step 5 · Final Answer")
 
 explanation = explainer.explain(
-    parsed_problem,
-    solver_output,
-    verifier_output,
-    retrieved_chunks
+    parsed,
+    solution,
+    verification,
+    retrieved
 )
 
 st.markdown(f"### ✅ {explanation['final_answer']}")
@@ -263,75 +217,6 @@ for i, step in enumerate(explanation["explanation_steps"], 1):
 st.markdown("#### ⚠️ Common mistakes")
 for m in explanation["common_mistakes"]:
     st.write(f"• {m}")
-    
-# =========================================================
-# PHASE 7 — HUMAN IN THE LOOP (REAL)
-# =========================================================
-
-hitl_triggered = verifier_output["needs_human_review"]
-
-st.divider()
-st.subheader("🧑‍🏫 Human Review (HITL)")
-
-if hitl_triggered:
-    st.warning(
-        "The system is not confident. "
-        "Please review and correct if needed."
-    )
-
-    # --- Editable parsed question ---
-    corrected_question = st.text_area(
-        "Edit the problem statement (if incorrect)",
-        value=parsed_problem["problem_text"],
-        height=150
-    )
-
-    # --- Editable final answer ---
-    corrected_answer = st.text_area(
-        "Correct the final answer",
-        value=solver_output["final_answer"],
-        height=120
-    )
-
-    # --- Human comment ---
-    human_comment = st.text_area(
-        "Reviewer comment (what went wrong / why this is correct)",
-        placeholder="Explain the correction briefly…",
-        height=100
-    )
-
-    approved = st.checkbox("I approve this correction as ground truth")
-
-    if approved and st.button("✅ Submit correction"):
-        store_hitl_signal({
-            "original_question": final_input_text,
-            "parsed_question": parsed_problem,
-            "retrieved_context": retrieved_chunks,
-            "ai_answer": solver_output["final_answer"],
-            "human_corrected_question": corrected_question,
-            "human_corrected_answer": corrected_answer,
-            "comment": human_comment,
-            "approved": True
-        })
-
-        st.success("Correction saved as learning signal.")
-        st.stop()
-else:
-    st.info("No human review required for this solution.")
-
-# =========================================================
-# FEEDBACK
-# =========================================================
-st.divider()
-st.subheader("Feedback")
-
-c1, c2 = st.columns(2)
-with c1:
-    if st.button("👍 Correct"):
-        st.success("Thanks! Feedback recorded.")
-with c2:
-    if st.button("👎 Incorrect"):
-        st.text_area("Tell us what was wrong")
 
 # =========================================================
 # FOOTER
