@@ -1,6 +1,7 @@
 import streamlit as st
 from tools.ocr import run_ocr
 from tools.asr import transcribe_audio
+from agents.parser_agent import parse_problem
 
 st.set_page_config(page_title="GanitAI", layout="centered")
 st.title("GanitAI – Multimodal Math Mentor")
@@ -19,11 +20,9 @@ input_confidence = None
 input_source = None
 
 # ======================
-# IMAGE INPUT (OCR)
+# IMAGE INPUT
 # ======================
 if input_mode == "🖼️ Image":
-    st.header("🖼️ Image Input")
-
     uploaded = st.file_uploader(
         "Upload a math problem image",
         type=["png", "jpg", "jpeg"]
@@ -35,9 +34,8 @@ if input_mode == "🖼️ Image":
 
         ocr_result = run_ocr("temp.png")
 
-        st.subheader("Extracted Text (OCR)")
         final_input_text = st.text_area(
-            "Edit before solving:",
+            "Edit extracted text:",
             value=ocr_result["text"],
             height=200
         )
@@ -51,16 +49,12 @@ if input_mode == "🖼️ Image":
         )
 
         if ocr_result["confidence"] < 0.75:
-            st.warning(
-                "Low OCR confidence — human review recommended (HITL)"
-            )
+            st.warning("Low OCR confidence — human review recommended (HITL)")
 
 # ======================
-# AUDIO INPUT (ASR)
+# AUDIO INPUT
 # ======================
 elif input_mode == "🎙️ Audio":
-    st.header("🎙️ Audio Input")
-
     audio_mode = st.radio(
         "Choose audio input method:",
         ["🎙️ Speak now (record)", "📁 Upload audio file"],
@@ -71,18 +65,15 @@ elif input_mode == "🎙️ Audio":
 
     if audio_mode == "🎙️ Speak now (record)":
         audio_bytes = st.audio_input("Speak your math question")
-
         if audio_bytes:
             with open("temp_audio.wav", "wb") as f:
                 f.write(audio_bytes.getbuffer())
             audio_path = "temp_audio.wav"
-
     else:
         audio_file = st.file_uploader(
             "Upload an audio file",
             type=["wav", "mp3", "m4a"]
         )
-
         if audio_file:
             with open("temp_audio.wav", "wb") as f:
                 f.write(audio_file.getbuffer())
@@ -91,15 +82,10 @@ elif input_mode == "🎙️ Audio":
     if audio_path:
         asr_result = transcribe_audio(audio_path)
 
-        st.subheader("Transcription Preview")
-
-        st.markdown(
-            asr_result["highlighted_html"],
-            unsafe_allow_html=True
-        )
+        st.markdown(asr_result["highlighted_html"], unsafe_allow_html=True)
 
         final_input_text = st.text_area(
-            "Edit transcription before solving:",
+            "Edit transcription:",
             value=asr_result["raw_text"],
             height=150
         )
@@ -110,39 +96,53 @@ elif input_mode == "🎙️ Audio":
         st.caption(f"ASR confidence: {asr_result['confidence']}")
 
         if asr_result["confidence"] < 0.75:
-            st.warning(
-                "Low transcription confidence — please review highlighted words (HITL)"
-            )
+            st.warning("Low transcription confidence — review required (HITL)")
 
 # ======================
-# TEXT INPUT (STEP 2.3)
+# TEXT INPUT
 # ======================
 elif input_mode == "⌨️ Text":
-    st.header("⌨️ Text Input")
-
     final_input_text = st.text_area(
         "Type your math question:",
-        placeholder=(
-            "Example:\n"
-            "Find the limit of sin(x)/x as x approaches 0."
-        ),
         height=180
     )
-
-    input_confidence = 1.0  # user-typed input assumed high confidence
+    input_confidence = 1.0
     input_source = "text"
 
-    st.caption("Confidence: user-provided text (assumed high)")
-
 # ======================
-# DEBUG / PREVIEW (temporary)
+# PARSER AGENT + HITL
 # ======================
 if final_input_text:
     st.divider()
-    st.subheader("🧪 Final Normalized Input (Preview)")
+    st.header("🧠 Parser Agent")
 
-    st.code(final_input_text)
-    st.caption(
-        f"Source: {input_source} | "
-        f"Confidence: {input_confidence}"
-    )
+    parsed_problem = parse_problem(final_input_text)
+
+    with st.expander("Structured representation"):
+        st.json(parsed_problem)
+
+    if parsed_problem["needs_clarification"]:
+        st.warning("Clarification required before solving")
+
+        answers = []
+        for i, q in enumerate(parsed_problem["clarification_questions"]):
+            ans = st.text_input(f"{i+1}. {q}")
+            if ans:
+                answers.append(ans)
+
+        if answers:
+            refined_text = (
+                parsed_problem["problem_text"]
+                + " | Clarifications: "
+                + "; ".join(answers)
+            )
+
+            st.success("Clarifications applied")
+            st.code(refined_text)
+
+            refined_parsed = parse_problem(refined_text)
+
+            with st.expander("Updated structured problem"):
+                st.json(refined_parsed)
+    else:
+        st.success("Problem is well-defined and ready for solving")

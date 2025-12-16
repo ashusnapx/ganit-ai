@@ -1,13 +1,21 @@
 import re
 from typing import Dict, List
 
-
+# ----------------------
+# Topic inference rules
+# ----------------------
 TOPIC_KEYWORDS = {
     "algebra": ["solve", "equation", "root", "polynomial"],
     "probability": ["probability", "chance", "random", "dice", "coin"],
     "calculus": ["limit", "derivative", "integral", "differentiate"],
     "linear_algebra": ["matrix", "determinant", "vector", "eigen"]
 }
+
+
+def clean_text(text: str) -> str:
+    text = text.strip()
+    text = re.sub(r"\s+", " ", text)
+    return text
 
 
 def infer_topic(text: str) -> str:
@@ -19,7 +27,7 @@ def infer_topic(text: str) -> str:
 
 
 def extract_variables(text: str) -> List[str]:
-    # Single-letter variables common in JEE problems
+    # Single-letter variables (x, y, z etc.)
     return sorted(set(re.findall(r"\b[a-z]\b", text)))
 
 
@@ -34,20 +42,20 @@ def extract_constraints(text: str) -> List[str]:
     ]
 
     for pattern in patterns:
-        matches = re.findall(pattern, text)
-        constraints.extend(matches)
+        constraints.extend(re.findall(pattern, text))
 
     return constraints
 
 
-def detect_ambiguity(text: str) -> Dict:
+def detect_ambiguity(text: str, variables: List[str]) -> Dict:
     questions = []
+    lowered = text.lower()
 
-    if "find" in text.lower() and "?" not in text:
+    if "find" in lowered and "?" not in lowered:
         questions.append("What exactly needs to be found?")
 
-    if "x" in text and "real" not in text.lower():
-        questions.append("Should variables be assumed real numbers?")
+    if variables and "real" not in lowered:
+        questions.append("Should the variables be assumed real numbers?")
 
     return {
         "needs_clarification": len(questions) > 0,
@@ -55,24 +63,16 @@ def detect_ambiguity(text: str) -> Dict:
     }
 
 
-def clean_text(text: str) -> str:
-    text = text.strip()
-    text = re.sub(r"\s+", " ", text)
-    return text
-
-
 def parse_problem(raw_text: str) -> Dict:
     cleaned = clean_text(raw_text)
-    topic = infer_topic(cleaned)
     variables = extract_variables(cleaned)
-    constraints = extract_constraints(cleaned)
-    ambiguity = detect_ambiguity(cleaned)
+    ambiguity = detect_ambiguity(cleaned, variables)
 
     return {
         "problem_text": cleaned,
-        "topic": topic,
+        "topic": infer_topic(cleaned),
         "variables": variables,
-        "constraints": constraints,
+        "constraints": extract_constraints(cleaned),
         "assumptions": ["variables are real unless specified"],
         "needs_clarification": ambiguity["needs_clarification"],
         "clarification_questions": ambiguity["clarification_questions"]
