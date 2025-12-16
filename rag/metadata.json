@@ -1,0 +1,80 @@
+[
+  {
+    "text": "# Algebra \u2013 Common Mistakes\n\n- Forgetting \u00b1 while taking square roots\n- Cancelling variables without checking zero case\n- Ignoring extraneous roots\n- Solving equation without verifying in original expression\n",
+    "source": "algebra_common_mistakes.md",
+    "topic": "algebra",
+    "difficulty": "easy"
+  },
+  {
+    "text": "# Linear Algebra \u2013 Common Mistakes\n\n- Trying to invert a matrix with zero determinant\n- Confusing matrix multiplication with element-wise multiplication\n- Ignoring matrix dimensions\n",
+    "source": "linear_algebra_common_mistakes.md",
+    "topic": "algebra",
+    "difficulty": "medium"
+  },
+  {
+    "text": "# Calculus \u2013 Domain Constraints\n\n- Function must be defined around the point of limit\n- Differentiability implies continuity\n- Denominator must not be zero at evaluation point\n",
+    "source": "calculus_constraints.md",
+    "topic": "calculus",
+    "difficulty": "easy"
+  },
+  {
+    "text": "# Algebra \u2013 Domain Constraints\n\n- Division by zero is undefined\n- Square roots require non-negative arguments (for real numbers)\n- Logarithms require positive arguments\n",
+    "source": "algebra_constraints.md",
+    "topic": "algebra",
+    "difficulty": "easy"
+  },
+  {
+    "text": "# Solution Templates\n\n## Algebra Equation Solving\n1. Identify equation type\n2. Apply appropriate formula\n3. Solve algebraically\n4. Verify solutions in original equation\n\n## Limit Problems\n1. Check direct substitution\n2. Simplify expression\n3. Apply standard limits\n4. Verify domain validity\n\n## Proba",
+    "source": "solution_templates.md",
+    "topic": "general",
+    "difficulty": "easy"
+  },
+  {
+    "text": "bility Problems\n1. Define sample space\n2. Count favorable outcomes\n3. Apply probability formula\n4. Sanity check result (0\u20131)\n",
+    "source": "solution_templates.md",
+    "topic": "general",
+    "difficulty": "easy"
+  },
+  {
+    "text": "# Probability \u2013 Core Formulas\n\nP(A) = favorable outcomes / total outcomes\n\nP(A \u222a B) = P(A) + P(B) - P(A \u2229 B)\n\nConditional Probability:\nP(A|B) = P(A \u2229 B) / P(B)\n",
+    "source": "probability_formulas.md",
+    "topic": "probability",
+    "difficulty": "easy"
+  },
+  {
+    "text": "# Algebra \u2013 Core Formulas\n\n## Quadratic Equation\nFor ax\u00b2 + bx + c = 0:\nx = (-b \u00b1 \u221a(b\u00b2 - 4ac)) / (2a)\n\n## Identities\n(a + b)\u00b2 = a\u00b2 + 2ab + b\u00b2  \n(a - b)\u00b2 = a\u00b2 - 2ab + b\u00b2  \na\u00b2 - b\u00b2 = (a - b)(a + b)\n",
+    "source": "algebra_formulas.md",
+    "topic": "algebra",
+    "difficulty": "easy"
+  },
+  {
+    "text": "# Linear Algebra \u2013 Core Formulas\n\n## Determinant (2\u00d72)\n|a b|\n|c d| = ad - bc\n\n## Matrix Inverse (2\u00d72)\nA\u207b\u00b9 = (1/det(A)) \u00d7 [[d, -b], [-c, a]]\n",
+    "source": "linear_algebra_formulas.md",
+    "topic": "algebra",
+    "difficulty": "easy"
+  },
+  {
+    "text": "# Calculus \u2013 Core Formulas\n\n## Limits\nlim (x\u21920) sin(x)/x = 1\n\n## Derivatives\nd/dx (x\u207f) = n\u00b7x\u207f\u207b\u00b9  \nd/dx (sin x) = cos x  \nd/dx (cos x) = -sin x\n",
+    "source": "calculus_formulas.md",
+    "topic": "calculus",
+    "difficulty": "easy"
+  },
+  {
+    "text": "# Probability \u2013 Common Mistakes\n\n- Assuming independence without justification\n- Forgetting total probability rule\n- Counting same outcome multiple times\n",
+    "source": "probability_common_mistakes.md",
+    "topic": "probability",
+    "difficulty": "easy"
+  },
+  {
+    "text": "# Probability \u2013 Constraints\n\n- 0 \u2264 P(event) \u2264 1\n- Total probability of sample space = 1\n- Conditional probability defined only if P(B) > 0\n",
+    "source": "probability_constraints.md",
+    "topic": "probability",
+    "difficulty": "easy"
+  },
+  {
+    "text": "# Calculus \u2013 Common Mistakes\n\n- Applying L'H\u00f4pital\u2019s Rule when limit is not indeterminate\n- Differentiating term-by-term incorrectly\n- Ignoring domain before evaluating limits\n",
+    "source": "calculus_common_mistakes.md",
+    "topic": "calculus",
+    "difficulty": "easy"
+  }
+]

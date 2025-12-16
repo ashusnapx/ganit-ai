@@ -2,9 +2,19 @@ import streamlit as st
 from tools.ocr import run_ocr
 from tools.asr import transcribe_audio
 from agents.parser_agent import parse_problem
+from rag.retriever import Retriever
 
 st.set_page_config(page_title="GanitAI", layout="centered")
 st.title("GanitAI – Multimodal Math Mentor")
+
+# ======================
+# CACHED RAG RETRIEVER (IMPORTANT)
+# ======================
+@st.cache_resource
+def load_retriever():
+    return Retriever(top_k=4)
+
+retriever = load_retriever()
 
 # ======================
 # INPUT MODE SELECTOR
@@ -16,6 +26,7 @@ input_mode = st.radio(
 )
 
 final_input_text = None
+refined_input_text = None
 input_confidence = None
 input_source = None
 
@@ -131,18 +142,41 @@ if final_input_text:
                 answers.append(ans)
 
         if answers:
-            refined_text = (
+            refined_input_text = (
                 parsed_problem["problem_text"]
                 + " | Clarifications: "
                 + "; ".join(answers)
             )
 
             st.success("Clarifications applied")
-            st.code(refined_text)
+            st.code(refined_input_text)
 
-            refined_parsed = parse_problem(refined_text)
+            parsed_problem = parse_problem(refined_input_text)
 
             with st.expander("Updated structured problem"):
-                st.json(refined_parsed)
+                st.json(parsed_problem)
     else:
+        refined_input_text = parsed_problem["problem_text"]
         st.success("Problem is well-defined and ready for solving")
+
+# ======================
+# RAG RETRIEVAL (STEP 4.2)
+# ======================
+if refined_input_text:
+    st.divider()
+    st.header("📚 Retrieved Knowledge (RAG)")
+
+    retrieved_chunks = retriever.retrieve(refined_input_text)
+
+    if not retrieved_chunks:
+        st.error("I don’t know. No relevant knowledge found.")
+        st.stop()  # 🚨 IMPORTANT: block hallucination
+    else:
+        for i, chunk in enumerate(retrieved_chunks, 1):
+            with st.expander(
+                f"Chunk {i} | "
+                f"Topic: {chunk['topic']} | "
+                f"Difficulty: {chunk['difficulty']}"
+            ):
+                st.write(chunk["text"])
+                st.caption(f"Source: {chunk['source']}")
